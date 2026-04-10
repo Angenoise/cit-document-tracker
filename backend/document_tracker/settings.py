@@ -127,6 +127,9 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 
 CORS_ALLOW_CREDENTIALS = True
 
+# Optional max age (in seconds) for signed QR tokens. Set to 0 to disable expiry checks.
+QR_TOKEN_MAX_AGE = config('QR_TOKEN_MAX_AGE', default=0, cast=int)
+
 # Encryption key for IDEA algorithm (128-bit hex string)
 ENCRYPTION_KEY = config('ENCRYPTION_KEY', default='0123456789ABCDEF0123456789ABCDEF')
 

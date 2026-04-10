@@ -9,8 +9,16 @@ function DocumentList({ documents, onDeleteDocument, onViewDocument }) {
     setExpandedId(expandedId === id ? null : id)
   }
 
-  const downloadQR = (encrypted_id, title) => {
-    const qrElement = document.getElementById(`qr-${encrypted_id}`)
+  const getQrValue = (doc) => {
+    if (!doc.qr_token) {
+      return doc.encrypted_id
+    }
+    const encodedToken = encodeURIComponent(doc.qr_token)
+    return `${window.location.origin}/?qr_token=${encodedToken}`
+  }
+
+  const downloadQR = (qrId, title) => {
+    const qrElement = document.getElementById(`qr-${qrId}`)
     if (qrElement) {
       const canvas = qrElement.querySelector('canvas')
       const link = document.createElement('a')
@@ -88,9 +96,9 @@ function DocumentList({ documents, onDeleteDocument, onViewDocument }) {
 
                 <div className="qr-section">
                   <h4>🔗 QR Code</h4>
-                  <div id={`qr-${doc.encrypted_id}`} className="qr-container">
+                  <div id={`qr-${doc.id}`} className="qr-container">
                     <QRCode
-                      value={doc.encrypted_id}
+                      value={getQrValue(doc)}
                       size={200}
                       level="H"
                       includeMargin={true}
@@ -98,7 +106,7 @@ function DocumentList({ documents, onDeleteDocument, onViewDocument }) {
                   </div>
                   <button
                     className="btn-secondary btn-small"
-                    onClick={() => downloadQR(doc.encrypted_id, doc.title)}
+                    onClick={() => downloadQR(doc.id, doc.title)}
                   >
                     ⬇️ Download QR
                   </button>

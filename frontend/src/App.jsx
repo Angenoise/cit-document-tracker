@@ -58,6 +58,7 @@ function App() {
   const [authLoading, setAuthLoading] = useState(false)
   const [selectedDocument, setSelectedDocument] = useState(null)
   const [qrLookupResult, setQrLookupResult] = useState(null)
+  const [pendingQrToken, setPendingQrToken] = useState('')
 
   const authHeaders = () => {
     if (!authToken) {
@@ -147,12 +148,17 @@ function App() {
     }
   }
 
-  const resolveQrCode = async (encryptedId) => {
+  const resolveQrCode = async ({ token = '', encryptedId = '' }) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/documents/resolve_qr/`, {
-        headers: authHeaders(),
-        params: { encrypted_id: encryptedId },
-      })
+      const response = token
+        ? await axios.get(`${API_BASE_URL}/documents/resolve_qr_token/`, {
+          headers: authHeaders(),
+          params: { token },
+        })
+        : await axios.get(`${API_BASE_URL}/documents/resolve_qr/`, {
+          headers: authHeaders(),
+          params: { encrypted_id: encryptedId },
+        })
 
       setQrLookupResult(response.data)
       setSelectedDocument(response.data.document)
@@ -171,6 +177,29 @@ function App() {
       fetchStats()
     }
   }, [user, searchQuery, filterOwner])
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const tokenFromUrl = params.get('qr_token') || ''
+    if (tokenFromUrl) {
+      setPendingQrToken(tokenFromUrl)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!user || !pendingQrToken) {
+      return
+    }
+
+    resolveQrCode({ token: pendingQrToken })
+      .catch(() => {})
+      .finally(() => {
+        setPendingQrToken('')
+        const url = new URL(window.location.href)
+        url.searchParams.delete('qr_token')
+        window.history.replaceState({}, '', url.toString())
+      })
+  }, [user, pendingQrToken])
 
   const handleLogin = async ({ username, password }) => {
     setAuthError(null)

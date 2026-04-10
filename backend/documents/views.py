@@ -6,6 +6,8 @@ from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.contrib.auth.models import Group
 from django.conf import settings
+from django.core import signing
+from django.core.signing import BadSignature, SignatureExpired
 from django.utils import timezone
 from rest_framework import viewsets, status
 from rest_framework.authentication import TokenAuthentication
@@ -296,17 +298,82 @@ class DocumentViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        document = self.get_queryset().filter(encrypted_id=encrypted_id).first()
+        document = Document.objects.filter(encrypted_id=encrypted_id).first()
         if not document:
             return Response(
                 {'error': 'Document not found for the provided QR code'},
                 status=status.HTTP_404_NOT_FOUND
             )
 
+        if not request.user.is_staff and document.owner.lower() != request.user.username.lower():
+            return Response(
+                {'error': 'You are not allowed to access this document.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         create_document_activity(
             document,
             DocumentActivity.ACTION_LOOKED_UP,
             f'Document {document.document_number} was resolved from QR code.',
+            request.user,
+            previous_status=document.status,
+            new_status=document.status,
+        )
+
+        serializer = self.get_serializer(document)
+        return Response({
+            'document': serializer.data,
+            'resolved_document_id': str(document.id),
+            'resolved_document_number': document.document_number,
+            'resolved_reference_code': document.reference_code,
+        })
+
+    @action(detail=False, methods=['get'])
+    def resolve_qr_token(self, request):
+        """Resolve a signed QR token into a document with permission checks."""
+        qr_token = request.query_params.get('token')
+        if not qr_token:
+            return Response(
+                {'error': 'token query parameter is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        signer = signing.TimestampSigner(salt='documents.qr')
+        token_max_age = getattr(settings, 'QR_TOKEN_MAX_AGE', None)
+
+        try:
+            if token_max_age:
+                encrypted_id = signer.unsign(qr_token, max_age=token_max_age)
+            else:
+                encrypted_id = signer.unsign(qr_token)
+        except SignatureExpired:
+            return Response(
+                {'error': 'QR token has expired.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except BadSignature:
+            return Response(
+                {'error': 'Invalid QR token.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        document = Document.objects.filter(encrypted_id=encrypted_id).first()
+        if not document:
+            return Response(
+                {'error': 'Document not found for the provided QR token'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if not request.user.is_staff and document.owner.lower() != request.user.username.lower():
+            return Response(
+                {'error': 'You are not allowed to access this document.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        create_document_activity(
+            document,
+            DocumentActivity.ACTION_LOOKED_UP,
+            f'Document {document.document_number} was resolved from signed QR token.',
             request.user,
             previous_status=document.status,
             new_status=document.status,

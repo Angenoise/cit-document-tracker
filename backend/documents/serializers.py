@@ -4,6 +4,7 @@ Django REST Framework serializers for documents
 
 from django.contrib.auth.models import User
 from django.contrib.auth.models import Group
+from django.core import signing
 from rest_framework.authtoken.models import Token
 from rest_framework import serializers
 from .models import Document, DocumentActivity
@@ -30,6 +31,8 @@ class DocumentActivitySerializer(serializers.ModelSerializer):
 class DocumentSerializer(serializers.ModelSerializer):
     """Serializer for Document model"""
 
+    qr_token = serializers.SerializerMethodField()
+
     class Meta:
         model = Document
         fields = [
@@ -49,6 +52,7 @@ class DocumentSerializer(serializers.ModelSerializer):
             'remarks',
             'attachment',
             'encrypted_id',
+            'qr_token',
             'created_at',
             'updated_at'
         ]
@@ -62,6 +66,10 @@ class DocumentSerializer(serializers.ModelSerializer):
         if not value or not value.strip():
             raise serializers.ValidationError("Title cannot be empty")
         return value.strip()
+
+    def get_qr_token(self, instance):
+        signer = signing.TimestampSigner(salt='documents.qr')
+        return signer.sign(instance.encrypted_id)
 
     def validate_owner(self, value):
         """Validate owner is not empty if provided"""
