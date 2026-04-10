@@ -5,6 +5,7 @@ Django models for document tracking with IDEA encryption
 from django.db import models
 from encryption.idea import encrypt_document_id
 from django.conf import settings
+from django.contrib.auth.hashers import make_password, check_password
 from django.utils import timezone
 import uuid
 
@@ -75,6 +76,7 @@ class Document(models.Model):
     due_date = models.DateField(null=True, blank=True)
     remarks = models.TextField(blank=True, default='')
     attachment = models.FileField(upload_to='documents/', null=True, blank=True)
+    access_key_hash = models.CharField(max_length=128, blank=True, default='')
     encrypted_id = models.CharField(
         max_length=32,
         unique=True,
@@ -90,6 +92,19 @@ class Document(models.Model):
     
     def __str__(self):
         return f"{self.title} ({self.owner})"
+
+    def set_access_key(self, key: str):
+        self.access_key_hash = make_password(key)
+
+    def check_access_key(self, key: str) -> bool:
+        if not key:
+            return False
+
+        # Backward compatibility for documents created before key support.
+        if not self.access_key_hash:
+            return key == self.encrypted_id
+
+        return check_password(key, self.access_key_hash)
     
     def save(self, *args, **kwargs):
         """Encrypt document ID before saving if not already encrypted"""

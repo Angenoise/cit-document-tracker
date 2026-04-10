@@ -14,6 +14,7 @@ function DocumentForm({ onCreateDocument, isAdmin, currentUser }) {
     priority: 'Medium',
     due_date: '',
     remarks: '',
+    access_key: '',
     owner: '',
     attachment: null,
   })
@@ -55,6 +56,9 @@ function DocumentForm({ onCreateDocument, isAdmin, currentUser }) {
     if (!formData.receiver.trim()) {
       newErrors.receiver = 'Receiver is required'
     }
+    if (!formData.access_key.trim()) {
+      newErrors.access_key = 'Access key is required'
+    }
     if (isAdmin && !formData.owner.trim()) {
       newErrors.owner = 'Owner is required for admin-created documents'
     }
@@ -82,6 +86,7 @@ function DocumentForm({ onCreateDocument, isAdmin, currentUser }) {
       payload.append('receiver', formData.receiver.trim())
       payload.append('status', formData.status)
       payload.append('priority', formData.priority)
+      payload.append('access_key', formData.access_key.trim())
       if (formData.due_date) {
         payload.append('due_date', formData.due_date)
       }
@@ -106,6 +111,7 @@ function DocumentForm({ onCreateDocument, isAdmin, currentUser }) {
           priority: 'Medium',
           due_date: '',
           remarks: '',
+          access_key: '',
           owner: isAdmin ? '' : currentUser || '',
           attachment: null,
         })
@@ -217,6 +223,20 @@ function DocumentForm({ onCreateDocument, isAdmin, currentUser }) {
               disabled={loading}
             />
             {errors.receiver && <span className="error">{errors.receiver}</span>}
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="access_key">Document Access Key *</label>
+            <input
+              id="access_key"
+              type="password"
+              name="access_key"
+              value={formData.access_key}
+              onChange={handleChange}
+              placeholder="Set document access key"
+              disabled={loading}
+            />
+            {errors.access_key && <span className="error">{errors.access_key}</span>}
           </div>
 
           <div className="form-group">

@@ -4,9 +4,10 @@ Django REST Framework serializers for documents
 
 from django.contrib.auth.models import User
 from django.contrib.auth.models import Group
-from django.core import signing
 from rest_framework.authtoken.models import Token
 from rest_framework import serializers
+from encryption.idea import IDEA
+from django.conf import settings
 from .models import Document, DocumentActivity
 
 
@@ -31,7 +32,9 @@ class DocumentActivitySerializer(serializers.ModelSerializer):
 class DocumentSerializer(serializers.ModelSerializer):
     """Serializer for Document model"""
 
-    qr_token = serializers.SerializerMethodField()
+    idea_encrypted_internal_id = serializers.SerializerMethodField()
+
+    access_key = serializers.CharField(write_only=True, required=False, allow_blank=False)
 
     class Meta:
         model = Document
@@ -51,8 +54,9 @@ class DocumentSerializer(serializers.ModelSerializer):
             'due_date',
             'remarks',
             'attachment',
+            'access_key',
             'encrypted_id',
-            'qr_token',
+            'idea_encrypted_internal_id',
             'created_at',
             'updated_at'
         ]
@@ -67,9 +71,10 @@ class DocumentSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Title cannot be empty")
         return value.strip()
 
-    def get_qr_token(self, instance):
-        signer = signing.TimestampSigner(salt='documents.qr')
-        return signer.sign(instance.encrypted_id)
+    def get_idea_encrypted_internal_id(self, instance):
+        cipher = IDEA(settings.ENCRYPTION_KEY)
+        encrypted = cipher.encrypt(str(instance.id).encode('ascii'))
+        return encrypted.hex().upper()
 
     def validate_owner(self, value):
         """Validate owner is not empty if provided"""
@@ -88,10 +93,28 @@ class DocumentSerializer(serializers.ModelSerializer):
         return value.strip()
 
     def create(self, validated_data):
+        access_key = validated_data.pop('access_key', '').strip()
+        if not access_key:
+            raise serializers.ValidationError({'access_key': 'Access key is required.'})
+
         request = self.context.get('request')
         if not validated_data.get('owner') and request and request.user and not request.user.is_staff:
             validated_data['owner'] = request.user.username
-        return super().create(validated_data)
+
+        document = super().create(validated_data)
+        document.set_access_key(access_key)
+        document.save(update_fields=['access_key_hash'])
+        return document
+
+    def update(self, instance, validated_data):
+        access_key = validated_data.pop('access_key', '').strip() if 'access_key' in validated_data else ''
+        instance = super().update(instance, validated_data)
+
+        if access_key:
+            instance.set_access_key(access_key)
+            instance.save(update_fields=['access_key_hash'])
+
+        return instance
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
@@ -163,3 +186,33 @@ class TokenSerializer(serializers.ModelSerializer):
         model = Token
         fields = ['key', 'user_id', 'username', 'created']
         read_only_fields = ['key', 'created', 'user_id', 'username']
+
+
+class PublicDocumentSerializer(serializers.ModelSerializer):
+    """Serializer for public document listing without sensitive fields."""
+
+    idea_encrypted_internal_id = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Document
+        fields = [
+            'id',
+            'document_number',
+            'reference_code',
+            'department',
+            'title',
+            'doc_type',
+            'owner',
+            'status',
+            'priority',
+            'encrypted_id',
+            'idea_encrypted_internal_id',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = fields
+
+    def get_idea_encrypted_internal_id(self, instance):
+        cipher = IDEA(settings.ENCRYPTION_KEY)
+        encrypted = cipher.encrypt(str(instance.id).encode('ascii'))
+        return encrypted.hex().upper()

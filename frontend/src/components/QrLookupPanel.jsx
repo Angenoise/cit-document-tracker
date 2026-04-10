@@ -3,6 +3,7 @@ import './DocumentForm.css'
 
 function QrLookupPanel({ onLookup }) {
   const [encryptedId, setEncryptedId] = useState('')
+  const [accessKey, setAccessKey] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -14,27 +15,18 @@ function QrLookupPanel({ onLookup }) {
       return
     }
 
+    if (!accessKey.trim()) {
+      setError('Enter the document access key.')
+      return
+    }
+
     setLoading(true)
     setError('')
 
     try {
-      const rawInput = encryptedId.trim()
-      let token = ''
-      let fallbackEncryptedId = rawInput
-
-      try {
-        const parsedUrl = new URL(rawInput)
-        token = parsedUrl.searchParams.get('qr_token') || ''
-      } catch (_err) {
-        // Not a URL. Continue with direct token/encrypted-id parsing.
-      }
-
-      if (!token && rawInput.includes(':') && rawInput.length > 32) {
-        token = rawInput
-      }
-
-      await onLookup({ token, encryptedId: fallbackEncryptedId })
+      await onLookup(encryptedId.trim(), accessKey.trim())
       setEncryptedId('')
+      setAccessKey('')
     } catch (lookupError) {
       setError(lookupError.message || 'Unable to resolve QR code.')
     } finally {
@@ -45,7 +37,7 @@ function QrLookupPanel({ onLookup }) {
   return (
     <div className="form-card card">
       <h2>QR Lookup</h2>
-      <p className="form-info">Paste the QR URL, signed token, or encrypted ID to open the matching document record.</p>
+      <p className="form-info">Paste the encrypted ID and enter the document access key.</p>
       <form onSubmit={handleSubmit}>
         <div className="form-group">
           <label htmlFor="encryptedId">Encrypted ID</label>
@@ -54,7 +46,18 @@ function QrLookupPanel({ onLookup }) {
             type="text"
             value={encryptedId}
             onChange={(event) => setEncryptedId(event.target.value)}
-            placeholder="Paste QR URL, token, or encrypted ID"
+            placeholder="Enter encrypted ID from QR code"
+            disabled={loading}
+          />
+        </div>
+        <div className="form-group">
+          <label htmlFor="accessKey">Access Key</label>
+          <input
+            id="accessKey"
+            type="password"
+            value={accessKey}
+            onChange={(event) => setAccessKey(event.target.value)}
+            placeholder="Enter document key"
             disabled={loading}
           />
         </div>

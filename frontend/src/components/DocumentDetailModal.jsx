@@ -1,9 +1,33 @@
-import React from 'react'
+import React, { useState } from 'react'
 import './DocumentForm.css'
 
-function DocumentDetailModal({ document, onClose }) {
+function DocumentDetailModal({ document, onClose, onSave }) {
   if (!document) {
     return null
+  }
+
+  const [editMode, setEditMode] = useState(false)
+  const [formState, setFormState] = useState({
+    status: document.status || 'Pending',
+    priority: document.priority || 'Medium',
+    due_date: document.due_date || '',
+    remarks: document.remarks || '',
+  })
+
+  const handleChange = (event) => {
+    const { name, value } = event.target
+    setFormState((prev) => ({ ...prev, [name]: value }))
+  }
+
+  const handleSave = async () => {
+    if (!onSave) {
+      return
+    }
+
+    const result = await onSave(document.id, formState)
+    if (result.success) {
+      setEditMode(false)
+    }
   }
 
   return (
@@ -14,18 +38,57 @@ function DocumentDetailModal({ document, onClose }) {
             <h2>{document.title}</h2>
             <p>{document.document_number || 'Pending number'} - {document.reference_code || 'No reference code yet'}</p>
           </div>
-          <button className="btn-secondary" onClick={onClose}>Close</button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {!editMode ? (
+              <button className="btn-secondary" onClick={() => setEditMode(true)}>Edit</button>
+            ) : (
+              <button className="btn-secondary" onClick={handleSave}>Save</button>
+            )}
+            <button className="btn-secondary" onClick={onClose}>Close</button>
+          </div>
         </div>
 
         <div className="detail-grid">
           <div><strong>Department:</strong> {document.department}</div>
           <div><strong>Type:</strong> {document.doc_type}</div>
-          <div><strong>Status:</strong> {document.status}</div>
-          <div><strong>Priority:</strong> {document.priority}</div>
+          <div>
+            <strong>Status:</strong>{' '}
+            {editMode ? (
+              <select name="status" value={formState.status} onChange={handleChange}>
+                <option value="Pending">Pending</option>
+                <option value="In Process">In Process</option>
+                <option value="Approved">Approved</option>
+                <option value="Rejected">Rejected</option>
+                <option value="Completed">Completed</option>
+              </select>
+            ) : (
+              document.status
+            )}
+          </div>
+          <div>
+            <strong>Priority:</strong>{' '}
+            {editMode ? (
+              <select name="priority" value={formState.priority} onChange={handleChange}>
+                <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
+                <option value="Urgent">Urgent</option>
+              </select>
+            ) : (
+              document.priority
+            )}
+          </div>
           <div><strong>Owner:</strong> {document.owner}</div>
           <div><strong>Sender:</strong> {document.sender}</div>
           <div><strong>Receiver:</strong> {document.receiver}</div>
-          <div><strong>Due date:</strong> {document.due_date || 'N/A'}</div>
+          <div>
+            <strong>Due date:</strong>{' '}
+            {editMode ? (
+              <input type="date" name="due_date" value={formState.due_date || ''} onChange={handleChange} />
+            ) : (
+              document.due_date || 'N/A'
+            )}
+          </div>
           <div><strong>Encrypted ID:</strong> {document.encrypted_id}</div>
         </div>
 
@@ -36,7 +99,16 @@ function DocumentDetailModal({ document, onClose }) {
 
         <div className="form-group">
           <label>Remarks</label>
-          <div className="readonly-owner">{document.remarks || 'N/A'}</div>
+          {editMode ? (
+            <textarea
+              name="remarks"
+              value={formState.remarks}
+              onChange={handleChange}
+              rows="3"
+            />
+          ) : (
+            <div className="readonly-owner">{document.remarks || 'N/A'}</div>
+          )}
         </div>
 
         <div className="form-group">

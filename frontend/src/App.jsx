@@ -1,12 +1,9 @@
-import React, { useState, useEffect } from 'react'
+﻿import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 import { Toaster, toast } from 'react-hot-toast'
 import DocumentForm from './components/DocumentForm'
 import DocumentList from './components/DocumentList'
 import DocumentStats from './components/DocumentStats'
-import LoginForm from './components/LoginForm'
-import AdminPanel from './components/AdminPanel'
-import UserManagement from './components/UserManagement'
 import DocumentDetailModal from './components/DocumentDetailModal'
 import QrLookupPanel from './components/QrLookupPanel'
 import schoolLogo from './assets/school-logo.png'
@@ -52,69 +49,17 @@ function App() {
   const [stats, setStats] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterOwner, setFilterOwner] = useState('')
-  const [user, setUser] = useState(null)
-  const [authToken, setAuthToken] = useState(localStorage.getItem('authToken') || '')
-  const [authError, setAuthError] = useState(null)
-  const [authLoading, setAuthLoading] = useState(false)
   const [selectedDocument, setSelectedDocument] = useState(null)
+  const [selectedDocumentKey, setSelectedDocumentKey] = useState('')
   const [qrLookupResult, setQrLookupResult] = useState(null)
-  const [pendingQrToken, setPendingQrToken] = useState('')
-
-  const authHeaders = () => {
-    if (!authToken) {
-      return {}
-    }
-    return {
-      Authorization: `Token ${authToken}`,
-    }
-  }
-
-  const handleClearAuth = () => {
-    localStorage.removeItem('authToken')
-    setAuthToken('')
-    setUser(null)
-    setDocuments([])
-    setStats(null)
-    setSelectedDocument(null)
-    setQrLookupResult(null)
-  }
-
-  const fetchAuthStatus = async () => {
-    if (!authToken) {
-      return
-    }
-
-    try {
-      setAuthError(null)
-      const response = await axios.get(`${API_BASE_URL}/auth/status/`, {
-        headers: {
-          ...authHeaders(),
-          'Content-Type': 'application/json',
-        },
-      })
-      setUser(response.data)
-    } catch (err) {
-      console.error('Auth status failed:', err)
-      handleClearAuth()
-    }
-  }
-
-  useEffect(() => {
-    fetchAuthStatus()
-  }, [authToken])
 
   const fetchDocuments = async () => {
-    if (!user) {
-      return
-    }
-
     setLoading(true)
     setError(null)
 
     try {
       const response = await axios.get(`${API_BASE_URL}/documents/`, {
         headers: {
-          ...authHeaders(),
           'Content-Type': 'application/json',
         },
         params: {
@@ -133,14 +78,8 @@ function App() {
   }
 
   const fetchStats = async () => {
-    if (!user) {
-      return
-    }
-
     try {
-      const response = await axios.get(`${API_BASE_URL}/documents/stats/`, {
-        headers: authHeaders(),
-      })
+      const response = await axios.get(`${API_BASE_URL}/documents/stats/`)
       setStats(response.data)
     } catch (err) {
       setError(`Failed to fetch stats: ${getApiErrorMessage(err, 'Unable to load stats')}`)
@@ -148,20 +87,18 @@ function App() {
     }
   }
 
-  const resolveQrCode = async ({ token = '', encryptedId = '' }) => {
+  const resolveQrCode = async (encryptedId, accessKey) => {
     try {
-      const response = token
-        ? await axios.get(`${API_BASE_URL}/documents/resolve_qr_token/`, {
-          headers: authHeaders(),
-          params: { token },
-        })
-        : await axios.get(`${API_BASE_URL}/documents/resolve_qr/`, {
-          headers: authHeaders(),
-          params: { encrypted_id: encryptedId },
-        })
+      const response = await axios.get(`${API_BASE_URL}/documents/resolve_qr/`, {
+        headers: {
+          'X-Document-Key': accessKey,
+        },
+        params: { encrypted_id: encryptedId },
+      })
 
       setQrLookupResult(response.data)
       setSelectedDocument(response.data.document)
+      setSelectedDocumentKey(accessKey)
       toast.success('QR code resolved successfully')
       return response.data
     } catch (err) {
@@ -172,128 +109,9 @@ function App() {
   }
 
   useEffect(() => {
-    if (user) {
-      fetchDocuments()
-      fetchStats()
-    }
-  }, [user, searchQuery, filterOwner])
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const tokenFromUrl = params.get('qr_token') || ''
-    if (tokenFromUrl) {
-      setPendingQrToken(tokenFromUrl)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!user || !pendingQrToken) {
-      return
-    }
-
-    resolveQrCode({ token: pendingQrToken })
-      .catch(() => {})
-      .finally(() => {
-        setPendingQrToken('')
-        const url = new URL(window.location.href)
-        url.searchParams.delete('qr_token')
-        window.history.replaceState({}, '', url.toString())
-      })
-  }, [user, pendingQrToken])
-
-  const handleLogin = async ({ username, password }) => {
-    setAuthError(null)
-
-    if (!username?.trim() || !password) {
-      const message = 'Username and password are required.'
-      setAuthError(message)
-      return { success: false, error: message }
-    }
-
-    setAuthLoading(true)
-
-    try {
-      const response = await axios.post(
-        `${API_BASE_URL}/auth/login/`,
-        { username: username.trim(), password },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      )
-
-      const token = response.data.token
-      localStorage.setItem('authToken', token)
-      setAuthToken(token)
-      setUser({ username: response.data.username, is_staff: response.data.is_staff })
-      toast.success('Logged in successfully')
-      return { success: true }
-    } catch (err) {
-      const message = getApiErrorMessage(err, 'Login failed')
-      setAuthError(message)
-      return { success: false, error: message }
-    } finally {
-      setAuthLoading(false)
-    }
-  }
-
-  const handleRegister = async ({ username, password }) => {
-    setAuthError(null)
-
-    if (!username?.trim() || !password) {
-      const message = 'Username and password are required.'
-      setAuthError(message)
-      return { success: false, error: message }
-    }
-
-    setAuthLoading(true)
-
-    try {
-      const response = await axios.post(
-        `${API_BASE_URL}/auth/register/`,
-        { username: username.trim(), password },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      )
-
-      const token = response.data.token
-      localStorage.setItem('authToken', token)
-      setAuthToken(token)
-      setUser({ username: response.data.username, is_staff: response.data.is_staff })
-      toast.success('Account created successfully')
-      return { success: true }
-    } catch (err) {
-      const message = getApiErrorMessage(err, 'Registration failed')
-      setAuthError(message)
-      return { success: false, error: message }
-    } finally {
-      setAuthLoading(false)
-    }
-  }
-
-  const handleLogout = async () => {
-    try {
-      await axios.post(
-        `${API_BASE_URL}/auth/logout/`,
-        {},
-        {
-          headers: {
-            ...authHeaders(),
-            'Content-Type': 'application/json',
-          },
-        }
-      )
-    } catch (err) {
-      console.error('Logout failed:', err)
-    } finally {
-      handleClearAuth()
-      toast('Logged out successfully')
-    }
-  }
+    fetchDocuments()
+    fetchStats()
+  }, [searchQuery, filterOwner])
 
   const handleCreateDocument = async (formData) => {
     setError(null)
@@ -302,7 +120,6 @@ function App() {
       const isFormData = typeof FormData !== 'undefined' && formData instanceof FormData
       const response = await axios.post(`${API_BASE_URL}/documents/`, formData, {
         headers: {
-          ...authHeaders(),
           ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
         },
       })
@@ -323,9 +140,17 @@ function App() {
       return
     }
 
+    const accessKey = window.prompt('Enter document access key to delete:') || ''
+    if (!accessKey.trim()) {
+      toast.error('Document access key is required.')
+      return
+    }
+
     try {
       await axios.delete(`${API_BASE_URL}/documents/${documentId}/`, {
-        headers: authHeaders(),
+        headers: {
+          'X-Document-Key': accessKey.trim(),
+        },
       })
       setDocuments(documents.filter((doc) => doc.id !== documentId))
       fetchStats()
@@ -334,43 +159,55 @@ function App() {
     }
   }
 
-  const handleViewDocument = (document) => {
-    setSelectedDocument(document)
+  const handleViewDocument = async (document) => {
+    const accessKey = window.prompt('Enter document access key to view:') || ''
+    if (!accessKey.trim()) {
+      toast.error('Document access key is required.')
+      return
+    }
+
+    try {
+      const response = await axios.get(`${API_BASE_URL}/documents/${document.id}/`, {
+        headers: {
+          'X-Document-Key': accessKey.trim(),
+        },
+      })
+      setSelectedDocument(response.data)
+      setSelectedDocumentKey(accessKey.trim())
+    } catch (err) {
+      const message = getApiErrorMessage(err, 'Unable to open document')
+      toast.error(message)
+    }
+  }
+
+  const handleUpdateDocument = async (documentId, payload) => {
+    if (!selectedDocumentKey) {
+      const message = 'Open the document using a valid access key before editing.'
+      toast.error(message)
+      return { success: false, error: message }
+    }
+
+    try {
+      const response = await axios.patch(`${API_BASE_URL}/documents/${documentId}/`, payload, {
+        headers: {
+          'X-Document-Key': selectedDocumentKey,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      setSelectedDocument(response.data)
+      setDocuments((prev) => prev.map((doc) => (doc.id === response.data.id ? { ...doc, ...response.data } : doc)))
+      fetchStats()
+      toast.success('Document updated successfully')
+      return { success: true, data: response.data }
+    } catch (err) {
+      const message = getApiErrorMessage(err, 'Unable to update document')
+      toast.error(message)
+      return { success: false, error: message }
+    }
   }
 
   const owners = [...new Set(documents.map((doc) => doc.owner))].filter(Boolean)
-  const isAdmin = user?.is_staff
-
-  if (!user) {
-    return (
-      <div className="app">
-        <Toaster position="top-right" />
-        <div className="app-header">
-          <div className="header-row">
-            <div className="logo-item">
-              <img src={collegeLogo} alt="CIT Logo" style={{ height: '80px', width: 'auto' }} />
-            </div>
-            <div className="header-content">
-              <h1>CIT Document Tracker</h1>
-              <p>Login to access your documents and admin dashboard.</p>
-            </div>
-            <div className="logo-item">
-              <img src={schoolLogo} alt="University Logo" style={{ height: '80px', width: 'auto' }} />
-            </div>
-          </div>
-        </div>
-
-        <div className="container">
-          <LoginForm
-            onLogin={handleLogin}
-            onRegister={handleRegister}
-            authError={authError}
-            loading={authLoading}
-          />
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="app">
@@ -382,36 +219,23 @@ function App() {
           </div>
           <div className="header-content">
             <h1>CIT Document Tracker</h1>
-            <p>{isAdmin ? 'Admin dashboard and full document controls' : 'Your documents, encrypted and tracked securely'}</p>
+            <p>Pure document tracking for CIT with QR lookup and encrypted IDs.</p>
           </div>
           <div className="logo-item">
             <img src={schoolLogo} alt="University Logo" style={{ height: '80px', width: 'auto' }} />
           </div>
-        </div>
-        <div className="user-info">
-          <span>{`Signed in as ${user.username}${isAdmin ? ' (Admin)' : ''}`}</span>
-          <button className="btn-secondary" onClick={handleLogout}>
-            Logout
-          </button>
         </div>
       </div>
 
       <div className="container">
         {error && <div className="error-banner">{error}</div>}
 
-        {isAdmin ? (
-          <>
-            <AdminPanel stats={stats} />
-            <UserManagement authHeaders={authHeaders} />
-          </>
-        ) : (
-          stats && <DocumentStats stats={stats} />
-        )}
+        {stats && <DocumentStats stats={stats} />}
 
         <DocumentForm
           onCreateDocument={handleCreateDocument}
-          isAdmin={isAdmin}
-          currentUser={user.username}
+          isAdmin={true}
+          currentUser=""
         />
 
         <QrLookupPanel onLookup={resolveQrCode} />
@@ -451,7 +275,6 @@ function App() {
         ) : (
           <DocumentList
             documents={documents}
-            onDeleteDocument={handleDeleteDocument}
             onViewDocument={handleViewDocument}
           />
         )}
@@ -459,6 +282,7 @@ function App() {
         {selectedDocument && (
           <DocumentDetailModal
             document={selectedDocument}
+            onSave={handleUpdateDocument}
             onClose={() => setSelectedDocument(null)}
           />
         )}

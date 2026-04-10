@@ -104,12 +104,9 @@ REST_FRAMEWORK = {
     'DEFAULT_FILTER_BACKENDS': [
         'rest_framework.filters.OrderingFilter',
     ],
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication',
-        'rest_framework.authentication.SessionAuthentication',
-    ],
+    'DEFAULT_AUTHENTICATION_CLASSES': [],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
+        'rest_framework.permissions.AllowAny',
     ],
 }
 
@@ -126,9 +123,6 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 ]
 
 CORS_ALLOW_CREDENTIALS = True
-
-# Optional max age (in seconds) for signed QR tokens. Set to 0 to disable expiry checks.
-QR_TOKEN_MAX_AGE = config('QR_TOKEN_MAX_AGE', default=0, cast=int)
 
 # Encryption key for IDEA algorithm (128-bit hex string)
 ENCRYPTION_KEY = config('ENCRYPTION_KEY', default='0123456789ABCDEF0123456789ABCDEF')

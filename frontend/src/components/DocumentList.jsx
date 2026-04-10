@@ -2,23 +2,15 @@ import React, { useState } from 'react'
 import QRCode from 'qrcode.react'
 import './DocumentList.css'
 
-function DocumentList({ documents, onDeleteDocument, onViewDocument }) {
+function DocumentList({ documents, onViewDocument }) {
   const [expandedId, setExpandedId] = useState(null)
 
   const toggleExpand = (id) => {
     setExpandedId(expandedId === id ? null : id)
   }
 
-  const getQrValue = (doc) => {
-    if (!doc.qr_token) {
-      return doc.encrypted_id
-    }
-    const encodedToken = encodeURIComponent(doc.qr_token)
-    return `${window.location.origin}/?qr_token=${encodedToken}`
-  }
-
-  const downloadQR = (qrId, title) => {
-    const qrElement = document.getElementById(`qr-${qrId}`)
+  const downloadQR = (encrypted_id, title) => {
+    const qrElement = document.getElementById(`qr-${encrypted_id}`)
     if (qrElement) {
       const canvas = qrElement.querySelector('canvas')
       const link = document.createElement('a')
@@ -66,8 +58,8 @@ function DocumentList({ documents, onDeleteDocument, onViewDocument }) {
 
             <div className="card-meta">
               <span className="meta-item">
-                🆔 <strong>ID:</strong>
-                <code className="doc-id">{doc.id.substring(0, 8)}...</code>
+                🆔 <strong>Enc ID:</strong>
+                <code className="doc-id">{(doc.idea_encrypted_internal_id || '').substring(0, 12)}...</code>
               </span>
               <span className="meta-item">📅 {new Date(doc.created_at).toLocaleDateString()}</span>
               <span className="meta-item">Dept: {doc.department}</span>
@@ -78,7 +70,7 @@ function DocumentList({ documents, onDeleteDocument, onViewDocument }) {
             {expandedId === doc.id && (
               <div className="card-expanded">
                 <div className="encryption-info">
-                  <h4>Encrypted ID</h4>
+                  <h4>Encrypted ID (Copy/Paste)</h4>
                   <div className="encrypted-id-display">
                     <code>{doc.encrypted_id}</code>
                     <button
@@ -89,16 +81,14 @@ function DocumentList({ documents, onDeleteDocument, onViewDocument }) {
                       📋
                     </button>
                   </div>
-                  <p className="encryption-note">
-                    This ID is encrypted using IDEA algorithm
-                  </p>
+                  <p className="encryption-note">Use this value in QR Lookup if scanning is difficult.</p>
                 </div>
 
                 <div className="qr-section">
                   <h4>🔗 QR Code</h4>
-                  <div id={`qr-${doc.id}`} className="qr-container">
+                  <div id={`qr-${doc.encrypted_id}`} className="qr-container">
                     <QRCode
-                      value={getQrValue(doc)}
+                      value={doc.encrypted_id}
                       size={200}
                       level="H"
                       includeMargin={true}
@@ -106,82 +96,15 @@ function DocumentList({ documents, onDeleteDocument, onViewDocument }) {
                   </div>
                   <button
                     className="btn-secondary btn-small"
-                    onClick={() => downloadQR(doc.id, doc.title)}
+                    onClick={() => downloadQR(doc.encrypted_id, doc.title)}
                   >
                     ⬇️ Download QR
                   </button>
-                </div>
-
-                <div className="card-details">
-                  <div className="detail-row">
-                    <span className="label">Description:</span>
-                    <span className="value">{doc.description || 'N/A'}</span>
-                  </div>
-                  <div className="detail-row">
-                    <span className="label">Reference code:</span>
-                    <span className="value">{doc.reference_code || 'N/A'}</span>
-                  </div>
-                  <div className="detail-row">
-                    <span className="label">Department:</span>
-                    <span className="value">{doc.department}</span>
-                  </div>
-                  <div className="detail-row">
-                    <span className="label">Sender:</span>
-                    <span className="value">{doc.sender}</span>
-                  </div>
-                  <div className="detail-row">
-                    <span className="label">Receiver:</span>
-                    <span className="value">{doc.receiver}</span>
-                  </div>
-                  <div className="detail-row">
-                    <span className="label">Full ID:</span>
-                    <span className="value">{doc.id}</span>
-                  </div>
-                  <div className="detail-row">
-                    <span className="label">Due date:</span>
-                    <span className="value">{doc.due_date || 'N/A'}</span>
-                  </div>
-                  <div className="detail-row">
-                    <span className="label">Remarks:</span>
-                    <span className="value">{doc.remarks || 'N/A'}</span>
-                  </div>
-                  <div className="detail-row">
-                    <span className="label">Attachment:</span>
-                    <span className="value">
-                      {doc.attachment ? (
-                        <a href={doc.attachment} target="_blank" rel="noreferrer">Open file</a>
-                      ) : 'N/A'}
-                    </span>
-                  </div>
-                  <div className="detail-row">
-                    <span className="label">Created:</span>
-                    <span className="value">
-                      {new Date(doc.created_at).toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="detail-row">
-                    <span className="label">Updated:</span>
-                    <span className="value">
-                      {new Date(doc.updated_at).toLocaleString()}
-                    </span>
-                  </div>
                 </div>
               </div>
             )}
 
             <div className="card-actions">
-              <button
-                className="btn-secondary btn-small"
-                onClick={() => onViewDocument && onViewDocument(doc)}
-              >
-                View Details
-              </button>
-              <button
-                className="btn-danger btn-small"
-                onClick={() => onDeleteDocument(doc.id)}
-              >
-                🗑️ Delete
-              </button>
             </div>
           </div>
         ))}
