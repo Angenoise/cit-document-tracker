@@ -3,14 +3,23 @@ Django REST Framework views for document management.
 """
 
 from django.utils import timezone
+from django.contrib.auth import authenticate
+from django.contrib.auth.models import User
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
 from rest_framework.filters import OrderingFilter, SearchFilter
+from rest_framework.views import APIView
+from rest_framework.authtoken.models import Token
 
 from .models import Document, DocumentActivity
-from .serializers import DocumentSerializer, DocumentActivitySerializer, PublicDocumentSerializer
+from .serializers import (
+    DocumentSerializer,
+    DocumentActivitySerializer,
+    PublicDocumentSerializer,
+    UserSerializer,
+)
 
 
 def create_document_activity(document, action, message, changed_by=None, previous_status='', new_status=''):
@@ -27,12 +36,15 @@ def create_document_activity(document, action, message, changed_by=None, previou
 
 
 class DocumentActivityViewSet(viewsets.ReadOnlyModelViewSet):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     serializer_class = DocumentActivitySerializer
     queryset = DocumentActivity.objects.select_related('document').all()
 
     def get_queryset(self):
         queryset = super().get_queryset()
+        if not self.request.user.is_staff:
+            queryset = queryset.filter(document__owner__iexact=self.request.user.username)
+
         document_id = self.request.query_params.get('document_id')
         if document_id:
             queryset = queryset.filter(document_id=document_id)
@@ -40,9 +52,9 @@ class DocumentActivityViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class DocumentViewSet(viewsets.ModelViewSet):
-    """ViewSet for managing documents in open no-auth mode."""
+    """ViewSet for managing documents with token authentication and roles."""
 
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     queryset = Document.objects.all()
     serializer_class = DocumentSerializer
     filter_backends = [SearchFilter, OrderingFilter]
@@ -77,18 +89,38 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
         return None
 
+    def _validate_owner_access(self, request, document):
+        if request.user.is_staff:
+            return None
+
+        if document.owner.strip().lower() != request.user.username.strip().lower():
+            return Response({'error': 'You do not have permission to access this document.'}, status=status.HTTP_403_FORBIDDEN)
+
+        return None
+
     def get_queryset(self):
         queryset = super().get_queryset()
+        if not self.request.user.is_staff:
+            queryset = queryset.filter(owner__iexact=self.request.user.username)
+
         owner = self.request.query_params.get('owner')
-        if owner:
+        if owner and self.request.user.is_staff:
             queryset = queryset.filter(owner__iexact=owner)
         return queryset
 
     def perform_create(self, serializer):
-        serializer.save()
+        if self.request.user.is_staff:
+            serializer.save()
+            return
+
+        serializer.save(owner=self.request.user.username)
 
     def perform_update(self, serializer):
-        serializer.save()
+        if self.request.user.is_staff:
+            serializer.save()
+            return
+
+        serializer.save(owner=self.request.user.username)
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -113,16 +145,20 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def stats(self, request):
-        total_documents = Document.objects.count()
-        owners = Document.objects.values('owner').distinct().count()
-        recent_count = Document.objects.filter(created_at__gte=timezone.now().replace(day=1)).count()
+        base_queryset = Document.objects.all()
+        if not request.user.is_staff:
+            base_queryset = base_queryset.filter(owner__iexact=request.user.username)
+
+        total_documents = base_queryset.count()
+        owners = base_queryset.values('owner').distinct().count()
+        recent_count = base_queryset.filter(created_at__gte=timezone.now().replace(day=1)).count()
 
         status_counts = {
-            'pending': Document.objects.filter(status=Document.STATUS_PENDING).count(),
-            'in_process': Document.objects.filter(status=Document.STATUS_IN_PROCESS).count(),
-            'approved': Document.objects.filter(status=Document.STATUS_APPROVED).count(),
-            'rejected': Document.objects.filter(status=Document.STATUS_REJECTED).count(),
-            'completed': Document.objects.filter(status=Document.STATUS_COMPLETED).count(),
+            'pending': base_queryset.filter(status=Document.STATUS_PENDING).count(),
+            'in_process': base_queryset.filter(status=Document.STATUS_IN_PROCESS).count(),
+            'approved': base_queryset.filter(status=Document.STATUS_APPROVED).count(),
+            'rejected': base_queryset.filter(status=Document.STATUS_REJECTED).count(),
+            'completed': base_queryset.filter(status=Document.STATUS_COMPLETED).count(),
         }
 
         return Response({
@@ -134,6 +170,9 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def by_owner(self, request):
+        if not request.user.is_staff:
+            return Response({'error': 'Only admin users can filter by arbitrary owner.'}, status=status.HTTP_403_FORBIDDEN)
+
         owner = request.query_params.get('owner')
         if not owner:
             return Response({'error': 'owner query parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
@@ -151,6 +190,10 @@ class DocumentViewSet(viewsets.ModelViewSet):
         document = Document.objects.filter(encrypted_id=encrypted_id).first()
         if not document:
             return Response({'error': 'Document not found for the provided QR code'}, status=status.HTTP_404_NOT_FOUND)
+
+        owner_error = self._validate_owner_access(request, document)
+        if owner_error:
+            return owner_error
 
         access_error = self._validate_document_access(request, document)
         if access_error:
@@ -175,6 +218,10 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
     def retrieve(self, request, *args, **kwargs):
         document = self.get_object()
+        owner_error = self._validate_owner_access(request, document)
+        if owner_error:
+            return owner_error
+
         access_error = self._validate_document_access(request, document)
         if access_error:
             return access_error
@@ -184,6 +231,10 @@ class DocumentViewSet(viewsets.ModelViewSet):
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
+        owner_error = self._validate_owner_access(request, instance)
+        if owner_error:
+            return owner_error
+
         access_error = self._validate_document_access(request, instance)
         if access_error:
             return access_error
@@ -206,6 +257,10 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
+        owner_error = self._validate_owner_access(request, instance)
+        if owner_error:
+            return owner_error
+
         access_error = self._validate_document_access(request, instance)
         if access_error:
             return access_error
@@ -219,3 +274,64 @@ class DocumentViewSet(viewsets.ModelViewSet):
             new_status='Deleted',
         )
         return super().destroy(request, *args, **kwargs)
+
+
+class LoginView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        username = (request.data.get('username') or '').strip()
+        password = request.data.get('password') or ''
+
+        if not username or not password:
+            return Response({'error': 'Username and password are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = authenticate(username=username, password=password)
+        if not user:
+            return Response({'error': 'Invalid username or password.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        token, _ = Token.objects.get_or_create(user=user)
+        return Response({
+            'token': token.key,
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'is_staff': user.is_staff,
+            },
+        })
+
+
+class RegisterView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = UserSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save(is_staff=False)
+
+        token, _ = Token.objects.get_or_create(user=user)
+        return Response(
+            {
+                'token': token.key,
+                'user': {
+                    'id': user.id,
+                    'username': user.username,
+                    'is_staff': user.is_staff,
+                },
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        Token.objects.filter(user=request.user).delete()
+        return Response({'message': 'Logged out successfully.'})
+
+
+class UserViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated, IsAdminUser]
+    serializer_class = UserSerializer
+    queryset = User.objects.all().order_by('username')

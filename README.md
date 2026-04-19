@@ -139,6 +139,32 @@ The frontend will be available at `http://localhost:5173`
 - **Backend API**: http://localhost:8000/api
 - **Django Admin**: http://localhost:8000/admin (use superuser credentials)
 
+## Deployment
+
+### Render Backend
+
+Use the `render.yaml` file at the repository root to create the backend service and PostgreSQL database on Render.
+
+Set these environment variables in Render:
+
+- `SECRET_KEY`
+- `ENCRYPTION_KEY`
+- `ALLOWED_HOSTS`
+- `CORS_ALLOWED_ORIGINS`
+- `CSRF_TRUSTED_ORIGINS`
+
+The backend service builds from the `backend/` folder and runs with Gunicorn.
+
+### Vercel Frontend
+
+Deploy the `frontend/` folder to Vercel. The included `frontend/vercel.json` ensures React Router-style refreshes work correctly.
+
+Set this environment variable in Vercel:
+
+- `VITE_API_BASE_URL` = your Render backend URL, for example `https://cit-document-tracker-api.onrender.com/api`
+
+After deployment, update the backend CORS and trusted origin env vars so they match the final Vercel URL.
+
 ## IDEA Encryption Algorithm
 
 ### Implementation Details

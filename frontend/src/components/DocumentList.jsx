@@ -2,15 +2,17 @@ import React, { useState } from 'react'
 import QRCode from 'qrcode.react'
 import './DocumentList.css'
 
-function DocumentList({ documents, onViewDocument }) {
+function DocumentList({ documents, onViewDocument, onDeleteDocument, qrBaseUrl }) {
   const [expandedId, setExpandedId] = useState(null)
 
   const toggleExpand = (id) => {
     setExpandedId(expandedId === id ? null : id)
   }
 
-  const downloadQR = (encrypted_id, title) => {
-    const qrElement = document.getElementById(`qr-${encrypted_id}`)
+  const buildQrLink = (encryptedId) => `${qrBaseUrl}?qr=${encodeURIComponent(encryptedId)}`
+
+  const downloadQR = (encryptedId, title) => {
+    const qrElement = document.getElementById(`qr-${encryptedId}`)
     if (qrElement) {
       const canvas = qrElement.querySelector('canvas')
       const link = document.createElement('a')
@@ -39,8 +41,10 @@ function DocumentList({ documents, onViewDocument }) {
       <h2>📋 Documents ({documents.length})</h2>
       
       <div className="documents-grid">
-        {documents.map((doc) => (
-          <div key={doc.id} className="document-card card">
+        {documents.map((doc) => {
+          const qrLink = buildQrLink(doc.encrypted_id)
+          return (
+            <div key={doc.id} className="document-card card">
             <div className="card-header">
               <div className="card-title-section">
                 <h3>{doc.title}</h3>
@@ -82,13 +86,24 @@ function DocumentList({ documents, onViewDocument }) {
                     </button>
                   </div>
                   <p className="encryption-note">Use this value in QR Lookup if scanning is difficult.</p>
+                  <div className="encrypted-id-display" style={{ marginTop: '10px' }}>
+                    <code>{qrLink}</code>
+                    <button
+                      className="copy-btn btn-small"
+                      onClick={() => copyToClipboard(qrLink)}
+                      title="Copy QR access link"
+                    >
+                      🔗
+                    </button>
+                  </div>
+                  <p className="encryption-note">QR now contains this secure document link.</p>
                 </div>
 
                 <div className="qr-section">
                   <h4>🔗 QR Code</h4>
                   <div id={`qr-${doc.encrypted_id}`} className="qr-container">
                     <QRCode
-                      value={doc.encrypted_id}
+                      value={qrLink}
                       size={200}
                       level="H"
                       includeMargin={true}
@@ -105,9 +120,18 @@ function DocumentList({ documents, onViewDocument }) {
             )}
 
             <div className="card-actions">
+              <button className="btn-secondary btn-small" onClick={() => onViewDocument(doc)}>
+                View
+              </button>
+              {onDeleteDocument && (
+                <button className="btn-danger btn-small" onClick={() => onDeleteDocument(doc.id)}>
+                  Delete
+                </button>
+              )}
             </div>
-          </div>
-        ))}
+            </div>
+          )
+        })}
       </div>
     </div>
   )

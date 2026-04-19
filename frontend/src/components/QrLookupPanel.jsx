@@ -1,11 +1,17 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import './DocumentForm.css'
 
-function QrLookupPanel({ onLookup }) {
+function QrLookupPanel({ onLookup, initialEncryptedId = '' }) {
   const [encryptedId, setEncryptedId] = useState('')
   const [accessKey, setAccessKey] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (initialEncryptedId) {
+      setEncryptedId(initialEncryptedId)
+    }
+  }, [initialEncryptedId])
 
   const handleSubmit = async (event) => {
     event.preventDefault()
