@@ -165,6 +165,73 @@ Set this environment variable in Vercel:
 
 After deployment, update the backend CORS and trusted origin env vars so they match the final Vercel URL.
 
+## Run on Another Device (LAN)
+
+If deployment is not ready yet, you can run the app on one computer and open it from another device connected to the same Wi-Fi/LAN.
+
+### 1. Pull latest code on host machine
+
+```bash
+git pull origin main
+```
+
+### 2. Start backend for network access
+
+From `backend/`:
+
+```bash
+python manage.py runserver 0.0.0.0:8000
+```
+
+### 3. Start frontend for network access
+
+From `frontend/`:
+
+```bash
+npm run dev -- --host 0.0.0.0 --port 5173
+```
+
+### 4. Find host machine IPv4 address
+
+On Windows:
+
+```bash
+ipconfig
+```
+
+Use the IPv4 address of the active network adapter (example: `192.168.1.25`).
+
+### 5. Set backend environment values for LAN
+
+Make sure these values include the host IP:
+
+- `ALLOWED_HOSTS=localhost,127.0.0.1,192.168.1.25`
+- `CORS_ALLOWED_ORIGINS=http://192.168.1.25:5173`
+- `CSRF_TRUSTED_ORIGINS=http://192.168.1.25:5173`
+
+### 6. Open firewall ports on host machine
+
+Allow inbound TCP traffic on:
+
+- `8000` (backend)
+- `5173` (frontend)
+
+### 7. Open app from the other device
+
+On another phone/laptop in the same network, open:
+
+```text
+http://192.168.1.25:5173
+```
+
+Replace `192.168.1.25` with your actual host machine IPv4.
+
+### Notes
+
+- This LAN method is for testing/demo use.
+- Do not expose these dev servers directly to the public internet.
+- The host machine must keep both backend and frontend terminal sessions running.
+
 ## IDEA Encryption Algorithm
 
 ### Implementation Details
