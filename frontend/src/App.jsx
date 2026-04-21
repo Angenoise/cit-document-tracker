@@ -290,17 +290,24 @@ function App() {
       return
     }
 
-    const accessKey = window.prompt('Enter document access key to delete:') || ''
-    if (!accessKey.trim()) {
-      toast.error('Document access key is required.')
-      return
+    let accessKey = ''
+    
+    if (!isAdmin) {
+      accessKey = window.prompt('Enter document access key to delete:') || ''
+      if (!accessKey.trim()) {
+        toast.error('Document access key is required.')
+        return
+      }
     }
 
     try {
+      const headers = authHeaders({})
+      if (accessKey) {
+        headers['X-Document-Key'] = accessKey.trim()
+      }
+      
       await axios.delete(`${API_BASE_URL}/documents/${documentId}/`, {
-        headers: authHeaders({
-          'X-Document-Key': accessKey.trim(),
-        }),
+        headers,
       })
       setDocuments(documents.filter((doc) => doc.id !== documentId))
       fetchStats()
@@ -315,17 +322,24 @@ function App() {
       return
     }
 
-    const accessKey = window.prompt('Enter document access key to view:') || ''
-    if (!accessKey.trim()) {
-      toast.error('Document access key is required.')
-      return
+    let accessKey = ''
+    
+    if (!isAdmin) {
+      accessKey = window.prompt('Enter document access key to view:') || ''
+      if (!accessKey.trim()) {
+        toast.error('Document access key is required.')
+        return
+      }
     }
 
     try {
+      const headers = authHeaders({})
+      if (accessKey) {
+        headers['X-Document-Key'] = accessKey.trim()
+      }
+      
       const response = await axios.get(`${API_BASE_URL}/documents/${document.id}/`, {
-        headers: authHeaders({
-          'X-Document-Key': accessKey.trim(),
-        }),
+        headers,
       })
       setSelectedDocument(response.data)
       setSelectedDocumentKey(accessKey.trim())

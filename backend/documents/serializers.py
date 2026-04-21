@@ -103,7 +103,7 @@ class DocumentSerializer(serializers.ModelSerializer):
 
         document = super().create(validated_data)
         document.set_access_key(access_key)
-        document.save(update_fields=['access_key_hash'])
+        document.save(update_fields=['access_key', 'access_key_hash'])
         return document
 
     def update(self, instance, validated_data):
@@ -112,15 +112,17 @@ class DocumentSerializer(serializers.ModelSerializer):
 
         if access_key:
             instance.set_access_key(access_key)
-            instance.save(update_fields=['access_key_hash'])
+            instance.save(update_fields=['access_key', 'access_key_hash'])
 
         return instance
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         representation['activities'] = DocumentActivitySerializer(instance.activities.all(), many=True).data
-        if instance.attachment and 'request' in self.context:
-            request = self.context['request']
+        request = self.context.get('request')
+        if request and getattr(request.user, 'is_staff', False):
+            representation['access_key'] = instance.access_key
+        if instance.attachment and request:
             representation['attachment'] = request.build_absolute_uri(instance.attachment.url)
         return representation
 

@@ -120,6 +120,15 @@ function DocumentDetailModal({ document, onClose, onSave }) {
           </div>
         </div>
 
+        {document.access_key && (
+          <div className="form-group">
+            <label>Access Key (Admin Only)</label>
+            <div className="readonly-owner" style={{ backgroundColor: '#fff3cd', padding: '10px', borderRadius: '4px' }}>
+              <strong>{document.access_key}</strong>
+            </div>
+          </div>
+        )}
+
         <div className="form-group">
           <label>Document Activity</label>
           <div className="timeline">

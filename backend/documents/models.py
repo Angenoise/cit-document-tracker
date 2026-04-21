@@ -76,6 +76,7 @@ class Document(models.Model):
     due_date = models.DateField(null=True, blank=True)
     remarks = models.TextField(blank=True, default='')
     attachment = models.FileField(upload_to='documents/', null=True, blank=True)
+    access_key = models.CharField(max_length=255, blank=True, default='')
     access_key_hash = models.CharField(max_length=128, blank=True, default='')
     encrypted_id = models.CharField(
         max_length=32,
@@ -94,6 +95,7 @@ class Document(models.Model):
         return f"{self.title} ({self.owner})"
 
     def set_access_key(self, key: str):
+        self.access_key = key
         self.access_key_hash = make_password(key)
 
     def check_access_key(self, key: str) -> bool:

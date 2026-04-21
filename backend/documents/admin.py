@@ -9,9 +9,9 @@ from .models import Document
 
 @admin.register(Document)
 class DocumentAdmin(admin.ModelAdmin):
-    list_display = ['title', 'owner', 'encrypted_id', 'access_key_hash', 'created_at']
-    search_fields = ['title', 'owner', 'encrypted_id', 'access_key_hash']
-    readonly_fields = ['id', 'encrypted_id', 'access_key_hash', 'created_at', 'updated_at']
+    list_display = ['title', 'owner', 'encrypted_id', 'access_key', 'created_at']
+    search_fields = ['title', 'owner', 'encrypted_id', 'access_key']
+    readonly_fields = ['id', 'encrypted_id', 'access_key', 'access_key_hash', 'created_at', 'updated_at']
     list_filter = ['created_at', 'owner']
     fieldsets = (
         (None, {
@@ -26,6 +26,7 @@ class DocumentAdmin(admin.ModelAdmin):
                 'document_number',
                 'reference_code',
                 'encrypted_id',
+                'access_key',
                 'access_key_hash',
             )
         }),

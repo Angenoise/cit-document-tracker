@@ -80,6 +80,9 @@ class DocumentViewSet(viewsets.ModelViewSet):
         return key
 
     def _validate_document_access(self, request, document):
+        if request.user.is_staff:
+            return None
+
         access_key = self._get_access_key(request)
         if not access_key:
             return Response({'error': 'Document access key is required.'}, status=status.HTTP_400_BAD_REQUEST)
