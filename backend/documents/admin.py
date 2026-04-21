@@ -9,10 +9,40 @@ from .models import Document
 
 @admin.register(Document)
 class DocumentAdmin(admin.ModelAdmin):
-    list_display = ['title', 'owner', 'encrypted_id', 'created_at']
-    search_fields = ['title', 'owner', 'encrypted_id']
-    readonly_fields = ['id', 'encrypted_id', 'created_at', 'updated_at']
+    list_display = ['title', 'owner', 'encrypted_id', 'access_key_hash', 'created_at']
+    search_fields = ['title', 'owner', 'encrypted_id', 'access_key_hash']
+    readonly_fields = ['id', 'encrypted_id', 'access_key_hash', 'created_at', 'updated_at']
     list_filter = ['created_at', 'owner']
+    fieldsets = (
+        (None, {
+            'fields': (
+                'id',
+                'title',
+                'owner',
+                'department',
+                'doc_type',
+                'status',
+                'priority',
+                'document_number',
+                'reference_code',
+                'encrypted_id',
+                'access_key_hash',
+            )
+        }),
+        ('Details', {
+            'fields': (
+                'description',
+                'sender',
+                'receiver',
+                'due_date',
+                'remarks',
+                'attachment',
+            )
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at')
+        }),
+    )
 
 
 @admin.register(Token)
