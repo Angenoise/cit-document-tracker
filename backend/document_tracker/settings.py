@@ -146,6 +146,14 @@ CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=False, cast=bo
 
 CORS_ALLOW_CREDENTIALS = True
 
+CORS_ALLOW_HEADERS = [
+    'authorization',
+    'content-type',
+    'x-csrftoken',
+    'access-control-allow-origin',
+    'x-document-key',
+]
+
 # Encryption key for IDEA algorithm (128-bit hex string)
 ENCRYPTION_KEY = config('ENCRYPTION_KEY', default='0123456789ABCDEF0123456789ABCDEF')
 
