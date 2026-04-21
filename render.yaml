@@ -21,26 +21,10 @@ services:
         value: https://your-vercel-app.vercel.app
       - key: CSRF_TRUSTED_ORIGINS
         value: https://your-vercel-app.vercel.app
-      - key: DB_NAME
+      - key: DATABASE_URL
         fromDatabase:
           name: cit-document-tracker-db
-          property: database
-      - key: DB_USER
-        fromDatabase:
-          name: cit-document-tracker-db
-          property: user
-      - key: DB_PASSWORD
-        fromDatabase:
-          name: cit-document-tracker-db
-          property: password
-      - key: DB_HOST
-        fromDatabase:
-          name: cit-document-tracker-db
-          property: host
-      - key: DB_PORT
-        fromDatabase:
-          name: cit-document-tracker-db
-          property: port
+          property: connectionString
 
 databases:
   - name: cit-document-tracker-db
