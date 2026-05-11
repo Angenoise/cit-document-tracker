@@ -10,12 +10,19 @@ import dj_database_url
 # Build paths inside the project
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+RUNNING_ON_RENDER = bool(
+    os.environ.get('RENDER')
+    or os.environ.get('RENDER_SERVICE_ID')
+    or os.environ.get('RENDER_SERVICE_NAME')
+    or os.environ.get('RENDER_EXTERNAL_URL')
+)
+
 # SECURITY WARNING: keep the secret key used in production secret!
 _secret = config('SECRET_KEY', default='')
 SECRET_KEY = _secret if _secret else 'django-insecure-dev-key-change-in-production'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config('DEBUG', default=True, cast=bool)
+DEBUG = config('DEBUG', default=not RUNNING_ON_RENDER, cast=bool)
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,testserver', cast=lambda v: [s.strip() for s in v.split(',')])
 

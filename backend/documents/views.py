@@ -5,6 +5,7 @@ Django REST Framework views for document management.
 from django.utils import timezone
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
+from django.db import DatabaseError, OperationalError
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
@@ -289,11 +290,25 @@ class LoginView(APIView):
         if not username or not password:
             return Response({'error': 'Username and password are required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        user = authenticate(username=username, password=password)
+        try:
+            user = authenticate(username=username, password=password)
+        except (OperationalError, DatabaseError):
+            return Response(
+                {'error': 'Authentication service is temporarily unavailable. Please try again later.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
         if not user:
             return Response({'error': 'Invalid username or password.'}, status=status.HTTP_401_UNAUTHORIZED)
 
-        token, _ = Token.objects.get_or_create(user=user)
+        try:
+            token, _ = Token.objects.get_or_create(user=user)
+        except (OperationalError, DatabaseError):
+            return Response(
+                {'error': 'Authentication service is temporarily unavailable. Please try again later.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
         return Response({
             'token': token.key,
             'user': {
