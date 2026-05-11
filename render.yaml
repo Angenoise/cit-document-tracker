@@ -5,8 +5,8 @@ services:
     region: oregon
     plan: free
     rootDir: backend
-    buildCommand: pip install -r requirements.txt && pip install django==5.0.2 && python manage.py collectstatic --noinput && python manage.py migrate
-    startCommand: gunicorn document_tracker.wsgi:application
+    buildCommand: pip install -r requirements.txt && pip install django==5.0.2 && python manage.py collectstatic --noinput
+    startCommand: python manage.py migrate --noinput && gunicorn document_tracker.wsgi:application
     autoDeploy: true
     envVars:
       - key: DEBUG
@@ -22,4 +22,6 @@ services:
       - key: CSRF_TRUSTED_ORIGINS
         value: https://cit-document-tracker-front.onrender.com
       - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_DATABASE_URL
         sync: false
