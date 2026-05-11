@@ -21,8 +21,6 @@ services:
         value: https://cit-document-tracker-front.onrender.com
       - key: CSRF_TRUSTED_ORIGINS
         value: https://cit-document-tracker-front.onrender.com
-      - key: DATABASE_URL
-        sync: false
       - key: SUPABASE_DATABASE_URL
         sync: false
       - key: RUN_MIGRATIONS

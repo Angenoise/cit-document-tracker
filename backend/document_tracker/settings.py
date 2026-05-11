@@ -4,6 +4,7 @@ Django settings for document_tracker project.
 
 import os
 from pathlib import Path
+from django.core.exceptions import ImproperlyConfigured
 from decouple import config
 import dj_database_url
 
@@ -72,7 +73,19 @@ TEMPLATES = [
 WSGI_APPLICATION = 'document_tracker.wsgi.application'
 
 # Database configuration
-DATABASE_URL = config('SUPABASE_DATABASE_URL', default=config('DATABASE_URL', default='')).strip()
+running_on_render = bool(
+    os.environ.get('RENDER')
+    or os.environ.get('RENDER_SERVICE_ID')
+    or os.environ.get('RENDER_SERVICE_NAME')
+    or os.environ.get('RENDER_EXTERNAL_URL')
+)
+
+if running_on_render:
+    DATABASE_URL = config('SUPABASE_DATABASE_URL', default='').strip()
+    if not DATABASE_URL:
+        raise ImproperlyConfigured('SUPABASE_DATABASE_URL must be set on Render.')
+else:
+    DATABASE_URL = config('SUPABASE_DATABASE_URL', default=config('DATABASE_URL', default='')).strip()
 
 if DATABASE_URL:
     DATABASES = {
