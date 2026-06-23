@@ -6,7 +6,7 @@ services:
     plan: free
     rootDir: backend
     buildCommand: pip install -r requirements.txt && pip install django==5.0.2 && python manage.py collectstatic --noinput
-    startCommand: bash -lc 'if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then python manage.py migrate --noinput; fi && gunicorn document_tracker.wsgi:application'
+    startCommand: bash -lc 'if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then python manage.py migrate --noinput; fi && gunicorn documenttracker.wsgi:application'
     autoDeploy: true
     envVars:
       - key: DEBUG
